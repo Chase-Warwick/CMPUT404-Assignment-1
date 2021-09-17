@@ -1,5 +1,6 @@
 #  coding: utf-8 
 import socketserver
+import os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -28,46 +29,84 @@ import socketserver
 
 
 class MyWebServer(socketserver.BaseRequestHandler):
-
+    #FIND BETTER WAY TO HANDLE FORBIDDEN STUFF
     def handle(self):
-        
+        """Handles requests from client"""
 
         self.data = self.request.recv(1024).strip().decode('utf-8')
         print ("Got a request of: %s\n" % self.data)
-        URL = self.get_url(self.data)
-        print(URL)
+        file_location = self.get_file_location(self.data)
 
-        if self.is_forbidden(URL):
-            print("Client attempted to access forbidden URL:Sending forbidden status code")
-            self.request.sendall(bytearray('HTTP/1.1 403 Forbidden', 'utf-8'))
+        #Handle case where requested file does not exist
+        if self.is_404_error(file_location):
+            print("Client attempted to access nonexistant path: " + file_location + ":Sending Not Found status code\n")
+            self.request.sendall(bytearray('HTTP/1.1 404 Not Found', 'utf-8'))
             return
-                
-        self.request.sendall(bytearray("HTTP/1.1 200 OK",'utf-8'))
-        if "GET / HTTP/1.1" in str(self.data):
-            self.request.sendall(bytearray(open("./www/index.html", 'r').read(), 'utf-8'))
-        if "base.css" in str(self.data):
-            self.request.sendall(bytearray(open("./www/base.css", 'r').read(), 'utf-8'))
-    
-    def get_url(self, data):
-        #REWRITE THIS
-        """
-        This function returns the first line of the request from the client which
-        includes the URL
-        """
-        return str(data).split('\n')[0].split(' ')[1]
-    
-    def is_forbidden(self, URL):
-        """
-        This function returns true if it finds that the URL
-        is within a forbidden subdirectory
-        """
-        FORBIDDEN_URLS = ["/deep/"]
+        #Handle case where requested file is forbidden
+        if self.is_405_error(file_location):
+            print("Client attempted to access forbidden URL: " + file_location + ":Sending Not Found status code\n")
+            self.request.sendall(bytearray('HTTP/1.1 405 Not Found', 'utf-8'))
+            return
+        
+        file_content = self.get_file_content(file_location)
+        #Handle general case
+        if os.path.isfile(file_location):
+            self.request.sendall(bytearray("HTTP/1.1 200 OK",'utf-8'))
+            self.request.sendall(bytearray(file_content, 'utf-8'))
+            self.request.sendall(bytearray(open(file_location, 'r').read(), 'utf-8'))
+        else:
+            self.request.sendall(bytearray("HTTP/1.1 200 OK",'utf-8'))
 
-        for forbidden_URL in FORBIDDEN_URLS:
-            if forbidden_URL in URL:
+    def get_file_location(self, data):
+        """
+        This function returns the location where the requested file lies
+        within the file path
+        """
+        FORBIDDEN_URLS = ['deep/']
+
+        file_name = './www' + str(data).split('\n')[0].split(' ')[1]
+
+        for forbidden_url in FORBIDDEN_URLS:
+            if forbidden_url in file_name:
+                return file_name
+
+        if file_name[-1] == '/':
+            file_name += 'index.html'
+        
+        return file_name
+
+    def get_file_content(self, file_location):
+        """
+        This function returns the http response which indicates the content
+        of the current file
+        """
+        file_types = ['html', 'css']
+        for type in file_types:
+            if type in file_location:
+                return '\nContent-Type:text/' + type + '\n'
+        return '\nContent-Type:text/plain\n'
+    
+    def is_404_error(self, URL):
+        """
+        This function checks if a 404 error should be thrown which occurs
+        in two cases, the path does not exist or the path given is outside of
+        www directory
+        """
+        FORBIDDEN_URLS = ['../']
+        if not os.path.exists(URL):
+            return True
+        for forbidden_url in FORBIDDEN_URLS:
+            if forbidden_url in URL:
                 return True
         return False
-            
+    
+    def is_405_error(self, URL):
+        #NEEDS IMPLEMENTATION
+        """
+        This function returns true if a 405 error should be thrown
+        which occurs when the client uses a method which is not permitted
+        """
+        return False
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
