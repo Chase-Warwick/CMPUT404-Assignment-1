@@ -28,11 +28,46 @@ import socketserver
 
 
 class MyWebServer(socketserver.BaseRequestHandler):
-    
+
     def handle(self):
-        self.data = self.request.recv(1024).strip()
+        
+
+        self.data = self.request.recv(1024).strip().decode('utf-8')
         print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        URL = self.get_url(self.data)
+        print(URL)
+
+        if self.is_forbidden(URL):
+            print("Client attempted to access forbidden URL:Sending forbidden status code")
+            self.request.sendall(bytearray('HTTP/1.1 403 Forbidden', 'utf-8'))
+            return
+                
+        self.request.sendall(bytearray("HTTP/1.1 200 OK",'utf-8'))
+        if "GET / HTTP/1.1" in str(self.data):
+            self.request.sendall(bytearray(open("./www/index.html", 'r').read(), 'utf-8'))
+        if "base.css" in str(self.data):
+            self.request.sendall(bytearray(open("./www/base.css", 'r').read(), 'utf-8'))
+    
+    def get_url(self, data):
+        #REWRITE THIS
+        """
+        This function returns the first line of the request from the client which
+        includes the URL
+        """
+        return str(data).split('\n')[0].split(' ')[1]
+    
+    def is_forbidden(self, URL):
+        """
+        This function returns true if it finds that the URL
+        is within a forbidden subdirectory
+        """
+        FORBIDDEN_URLS = ["/deep/"]
+
+        for forbidden_URL in FORBIDDEN_URLS:
+            if forbidden_URL in URL:
+                return True
+        return False
+            
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
