@@ -37,19 +37,14 @@ class MyWebServer(socketserver.BaseRequestHandler):
         print ("Got a request of: %s\n" % self.data)
         file_location = self.get_file_location(self.data)
         method = self.get_request_method(self.data)
-
-        print(method)
         
-        #Handle case where redirect is necessary
         if self.should_redirect(file_location):
-            print("Client should be redirected to a new directory: " + file_location + ":Sending 303 status code\n")
-            self.request.sendall(bytearray('HTTP/1.1 303 See Other','utf-8'))
-        #Handle case where method requested is not valid`
+            print("Client should be redirected to a new directory: " + file_location + " :Sending 301 status code\n")
+            self.request.sendall(bytearray('HTTP/1.1 301 Moved Permanently','utf-8'))
         if self.is_405_error(method):
             print("Client made an invalid request: " + method + ":Sending 405 status code\n")
             self.request.sendall(bytearray('HTTP/1.1 405 Not Found', 'utf-8'))
             return
-        #Handle case where requested file does not exist
         if self.is_404_error(file_location):
             print("Client attempted to access nonexistant path: " + file_location + ":Sending 404 status code\n")
             self.request.sendall(bytearray('HTTP/1.1 404 Not Found', 'utf-8'))
@@ -57,13 +52,9 @@ class MyWebServer(socketserver.BaseRequestHandler):
         
         
         file_content = self.get_file_content(file_location)
-        #Handle general case
-        if os.path.isfile(file_location):
-            self.request.sendall(bytearray("HTTP/1.1 200 OK",'utf-8'))
-            self.request.sendall(bytearray(file_content, 'utf-8'))
-            self.request.sendall(bytearray(open(file_location, 'r').read(), 'utf-8'))
-        else:
-            self.request.sendall(bytearray("HTTP/1.1 200 OK",'utf-8'))
+        self.request.sendall(bytearray("HTTP/1.1 200 OK",'utf-8'))
+        self.request.sendall(bytearray(file_content, 'utf-8'))
+        self.request.sendall(bytearray(open(file_location, 'r').read(), 'utf-8'))
 
     def get_request_method(self, data):
         """
