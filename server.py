@@ -36,17 +36,25 @@ class MyWebServer(socketserver.BaseRequestHandler):
         self.data = self.request.recv(1024).strip().decode('utf-8')
         print ("Got a request of: %s\n" % self.data)
         file_location = self.get_file_location(self.data)
+        method = self.get_request_method(self.data)
 
-        #Handle case where requested file does not exist
-        if self.is_404_error(file_location):
-            print("Client attempted to access nonexistant path: " + file_location + ":Sending Not Found status code\n")
-            self.request.sendall(bytearray('HTTP/1.1 404 Not Found', 'utf-8'))
-            return
-        #Handle case where requested file is forbidden
-        if self.is_405_error(file_location):
-            print("Client attempted to access forbidden URL: " + file_location + ":Sending Not Found status code\n")
+        print(method)
+        
+        #Handle case where redirect is necessary
+        if self.should_redirect(file_location):
+            print("Client should be redirected to a new directory: " + file_location + ":Sending 303 status code\n")
+            self.request.sendall(bytearray('HTTP/1.1 303 See Other','utf-8'))
+        #Handle case where method requested is not valid`
+        if self.is_405_error(method):
+            print("Client made an invalid request: " + method + ":Sending 405 status code\n")
             self.request.sendall(bytearray('HTTP/1.1 405 Not Found', 'utf-8'))
             return
+        #Handle case where requested file does not exist
+        if self.is_404_error(file_location):
+            print("Client attempted to access nonexistant path: " + file_location + ":Sending 404 status code\n")
+            self.request.sendall(bytearray('HTTP/1.1 404 Not Found', 'utf-8'))
+            return
+        
         
         file_content = self.get_file_content(file_location)
         #Handle general case
@@ -57,18 +65,18 @@ class MyWebServer(socketserver.BaseRequestHandler):
         else:
             self.request.sendall(bytearray("HTTP/1.1 200 OK",'utf-8'))
 
+    def get_request_method(self, data):
+        """
+        This function returns the method of an HTTP request
+        """
+        return str(data).split('\n')[0].split(' ')[0]
+
     def get_file_location(self, data):
         """
         This function returns the location where the requested file lies
         within the file path
         """
-        FORBIDDEN_URLS = ['deep/']
-
         file_name = './www' + str(data).split('\n')[0].split(' ')[1]
-
-        for forbidden_url in FORBIDDEN_URLS:
-            if forbidden_url in file_name:
-                return file_name
 
         if file_name[-1] == '/':
             file_name += 'index.html'
@@ -85,7 +93,19 @@ class MyWebServer(socketserver.BaseRequestHandler):
             if type in file_location:
                 return '\nContent-Type:text/' + type + '\n'
         return '\nContent-Type:text/plain\n'
-    
+
+    def should_redirect(self, URL):
+        #SHOULD REFACTOR TO ENSURE LESS HARDCODED DATA
+        """
+        This function checks against a variety of predefined URLs to see if there is a match
+        in the case that there is it returns True
+        """
+        REDIRECT_URLS = ["./www/deep"]
+        for redirect_URL in REDIRECT_URLS:
+            if redirect_URL == URL:
+                return True
+        return False
+
     def is_404_error(self, URL):
         """
         This function checks if a 404 error should be thrown which occurs
@@ -100,13 +120,16 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 return True
         return False
     
-    def is_405_error(self, URL):
+    def is_405_error(self, method):
         #NEEDS IMPLEMENTATION
         """
         This function returns true if a 405 error should be thrown
         which occurs when the client uses a method which is not permitted
         """
+        if not method == 'GET':
+            return True
         return False
+        
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
