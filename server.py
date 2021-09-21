@@ -2,6 +2,8 @@
 import socketserver
 import os
 
+from HTTP_Parser import HTTP_Parser
+
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,99 +35,69 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         """Handles requests from client"""
 
-        self.data = self.request.recv(1024).strip().decode('utf-8')
-        print ("Got a request of: %s\n" % self.data)
-        file_location = self.get_file_location(self.data)
-        method = self.get_request_method(self.data)
+        data = self.request.recv(1024).strip().decode('utf-8')
+        print ("Got a request of: %s\n" % data)
+        self.HTTP_parser = HTTP_Parser(data)
         
-        if self.should_redirect(file_location):
-            print("Client should be redirected to a new directory: " + file_location + " :Sending 301 status code\n")
-            self.request.sendall(bytearray('HTTP/1.1 301 Moved Permanently\r\n','utf-8'))
-            self.request.sendall(bytearray('Connection: close\r\n', 'utf-8'))
-            self.request.sendall(bytearray('location: /deep/\r\n', 'utf-8'))
-        if self.is_405_error(method):
-            print("Client made an invalid request: " + method + ":Sending 405 status code\n")
-            self.request.sendall(bytearray('HTTP/1.1 405 Not Found\r\n', 'utf-8'))
-            self.request.sendall(bytearray('Connection: close\r\n', 'utf-8'))
+        if self.should_redirect():
+            print("Client should be redirected to a new directory: " + self.HTTP_parser.get_path() + " :Sending 301 status code\n")
+            response = self.HTTP_parser.construct_HTTP_response(301)
+            self.request.sendall(bytearray(response,'utf-8'))
+        if self.is_405_error():
+            print("Client made an invalid request: " + self.HTTP_parser.get_request_method() + ":Sending 405 status code\n")
+            response = self.HTTP_parser.construct_HTTP_response(405)
+            self.request.sendall(bytearray(response, 'utf-8'))
             return
-        if self.is_404_error(file_location):
-            print("Client attempted to access nonexistant path: " + file_location + ":Sending 404 status code\n")
-            self.request.sendall(bytearray('HTTP/1.1 404 Not Found\r\n', 'utf-8'))
-            self.request.sendall(bytearray('Connection: close\r\n', 'utf-8'))
+        if self.is_404_error():
+            print("Client attempted to access nonexistant path: " + self.HTTP_parser.get_path() + ":Sending 404 status code\n")
+            response = self.HTTP_parser.construct_HTTP_response(404)
+            self.request.sendall(bytearray(response, 'utf-8'))
             return
         
-        
-        file_content = self.get_file_content(file_location)
-        #Send HTTP Response
-        self.request.sendall(bytearray("HTTP/1.1 200 OK\r\n",'utf-8'))
-        self.request.sendall(bytearray(file_content + '\r\n', 'utf-8'))
-        self.request.sendall(bytearray('Connection: close\r\n', 'utf-8'))
-        self.request.sendall(bytearray('\r\n', 'utf-8'))
-        self.request.sendall(bytearray(open(file_location, 'r').read() + '\r\n', 'utf-8'))
-        
+        response = self.HTTP_parser.construct_HTTP_response(200)
+        self.request.sendall(bytearray(response,'utf-8'))
 
-    def get_request_method(self, data):
-        """
-        This function returns the method of an HTTP request
-        """
-        return str(data).split('\n')[0].split(' ')[0]
-
-    def get_file_location(self, data):
-        """
-        This function returns the location where the requested file lies
-        within the file path
-        """
-        file_name = './www' + str(data).split('\n')[0].split(' ')[1]
-
-        if file_name[-1] == '/':
-            file_name += 'index.html'
-        
-        return file_name
-
-    def get_file_content(self, file_location):
-        """
-        This function returns the http response which indicates the content
-        of the current file
-        """
-        file_types = ['html', 'css']
-        for type in file_types:
-            if type in file_location:
-                return 'Content-Type:text/' + type
-        return 'Content-Type:text/plain'
-
-    def should_redirect(self, URL):
+    def should_redirect(self):
         #SHOULD REFACTOR TO ENSURE LESS HARDCODED DATA
         """
         This function checks against a variety of predefined URLs to see if there is a match
         in the case that there is it returns True
         """
-        REDIRECT_URLS = ["./www/deep"]
-        for redirect_URL in REDIRECT_URLS:
-            if redirect_URL == URL:
+        path = self.HTTP_parser.get_path()
+        REDIRECT_PATHS = ["./www/deep"]
+        for redirect_path in REDIRECT_PATHS:
+            if redirect_path == path:
                 return True
         return False
 
-    def is_404_error(self, URL):
+    def is_404_error(self):
         """
         This function checks if a 404 error should be thrown which occurs
         in two cases, the path does not exist or the path given is outside of
         www directory
         """
-        FORBIDDEN_URLS = ['../']
-        if not os.path.exists(URL):
+        FORBIDDEN_PATHS = ['../']
+        path = self.HTTP_parser.get_path()
+
+        if not os.path.exists(path):
             return True
-        for forbidden_url in FORBIDDEN_URLS:
-            if forbidden_url in URL:
+
+        for forbidden_path in FORBIDDEN_PATHS:
+            if forbidden_path in path:
                 return True
+        
         return False
     
-    def is_405_error(self, method):
+    def is_405_error(self):
         """
         This function returns true if a 405 error should be thrown
         which occurs when the client uses a method which is not permitted
         """
+        method = self.HTTP_parser.get_request_method()
+
         if not method == 'GET':
             return True
+
         return False
         
 
