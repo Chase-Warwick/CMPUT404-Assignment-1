@@ -43,12 +43,13 @@ class HTTP_Parser():
     def get_request_method(self):
         return self.request_method
     
-    def construct_HTTP_response(self, status):
+    def construct_HTTP_response(self, status, location=None):
         reponse = None
 
         if status == 200:
             response = 'HTTP/1.1 200 OK\r\n' + self.content_type + '\r\n' + 'Connection: close\r\n' + '\r\n' + open(self.path, 'r').read() + '\r\n'
         elif status == 301:
+            assert not location is None
             response = 'HTTP/1.1 301 Moved Permanently\r\n' + 'Connection: close\r\n' + 'location: /deep/\r\n' + '\r\n'
         elif status == 404:
             response = 'HTTP/1.1 404 Not Found\r\n' + 'Connection: close\r\n' + '\r\n'
