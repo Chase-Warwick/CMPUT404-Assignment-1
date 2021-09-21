@@ -34,18 +34,20 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         """Handles requests from client"""
 
-        redirect = {
+        self.redirect = {
         "./www/deep" : "/deep/"
         }
+
+        self.FORBIDDEN_PATHS = ['../']
         
         data = self.request.recv(1024).strip().decode('utf-8')
         print ("Got a request of: %s\n" % data)
         self.HTTP_parser = HTTP_Parser(data)
         
-        if self.should_redirect(redirect):
+        if self.should_redirect():
             path = self.HTTP_parser.get_path()
             print("Client should be redirected to a new directory: " + path + " :Sending 301 status code\n")
-            response = self.HTTP_parser.construct_HTTP_response(301, path)
+            response = self.HTTP_parser.construct_HTTP_response(301, self.redirect[path])
             self.request.sendall(bytearray(response,'utf-8'))
         if self.is_405_error():
             print("Client made an invalid request: " + self.HTTP_parser.get_request_method() + ":Sending 405 status code\n")
@@ -61,27 +63,26 @@ class MyWebServer(socketserver.BaseRequestHandler):
         response = self.HTTP_parser.construct_HTTP_response(200)
         self.request.sendall(bytearray(response,'utf-8'))
 
-    def should_redirect(self, redirect):
+    def should_redirect(self):
         """
         This function checks against a variety of predefined URLs to see if there is a match
         in the case that there is it returns True
         """
         path = self.HTTP_parser.get_path()
-        print(path in redirect)
-        return path in redirect
+        return path in self.redirect
+
     def is_404_error(self):
         """
         This function checks if a 404 error should be thrown which occurs
         in two cases, the path does not exist or the path given is outside of
         www directory
         """
-        FORBIDDEN_PATHS = ['../']
         path = self.HTTP_parser.get_path()
 
         if not os.path.exists(path):
             return True
 
-        for forbidden_path in FORBIDDEN_PATHS:
+        for forbidden_path in self.FORBIDDEN_PATHS:
             if forbidden_path in path:
                 return True
         
