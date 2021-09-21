@@ -40,21 +40,29 @@ class MyWebServer(socketserver.BaseRequestHandler):
         
         if self.should_redirect(file_location):
             print("Client should be redirected to a new directory: " + file_location + " :Sending 301 status code\n")
-            self.request.sendall(bytearray('HTTP/1.1 301 Moved Permanently','utf-8'))
+            self.request.sendall(bytearray('HTTP/1.1 301 Moved Permanently\r\n','utf-8'))
+            self.request.sendall(bytearray('Connection: close\r\n', 'utf-8'))
+            self.request.sendall(bytearray('location: /deep/\r\n', 'utf-8'))
         if self.is_405_error(method):
             print("Client made an invalid request: " + method + ":Sending 405 status code\n")
-            self.request.sendall(bytearray('HTTP/1.1 405 Not Found', 'utf-8'))
+            self.request.sendall(bytearray('HTTP/1.1 405 Not Found\r\n', 'utf-8'))
+            self.request.sendall(bytearray('Connection: close\r\n', 'utf-8'))
             return
         if self.is_404_error(file_location):
             print("Client attempted to access nonexistant path: " + file_location + ":Sending 404 status code\n")
-            self.request.sendall(bytearray('HTTP/1.1 404 Not Found', 'utf-8'))
+            self.request.sendall(bytearray('HTTP/1.1 404 Not Found\r\n', 'utf-8'))
+            self.request.sendall(bytearray('Connection: close\r\n', 'utf-8'))
             return
         
         
         file_content = self.get_file_content(file_location)
-        self.request.sendall(bytearray("HTTP/1.1 200 OK",'utf-8'))
-        self.request.sendall(bytearray(file_content, 'utf-8'))
-        self.request.sendall(bytearray(open(file_location, 'r').read(), 'utf-8'))
+        #Send HTTP Response
+        self.request.sendall(bytearray("HTTP/1.1 200 OK\r\n",'utf-8'))
+        self.request.sendall(bytearray(file_content + '\r\n', 'utf-8'))
+        self.request.sendall(bytearray('Connection: close\r\n', 'utf-8'))
+        self.request.sendall(bytearray('\r\n', 'utf-8'))
+        self.request.sendall(bytearray(open(file_location, 'r').read() + '\r\n', 'utf-8'))
+        
 
     def get_request_method(self, data):
         """
@@ -82,8 +90,8 @@ class MyWebServer(socketserver.BaseRequestHandler):
         file_types = ['html', 'css']
         for type in file_types:
             if type in file_location:
-                return '\nContent-Type:text/' + type + '\n'
-        return '\nContent-Type:text/plain\n'
+                return 'Content-Type:text/' + type
+        return 'Content-Type:text/plain'
 
     def should_redirect(self, URL):
         #SHOULD REFACTOR TO ENSURE LESS HARDCODED DATA
@@ -112,7 +120,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
         return False
     
     def is_405_error(self, method):
-        #NEEDS IMPLEMENTATION
         """
         This function returns true if a 405 error should be thrown
         which occurs when the client uses a method which is not permitted
