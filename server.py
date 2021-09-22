@@ -49,6 +49,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
             print("Client should be redirected to a new directory: " + path + " :Sending 301 status code\n")
             response = self.HTTP_parser.construct_HTTP_response(301, self.redirect[path])
             self.request.sendall(bytearray(response,'utf-8'))
+            return
         if self.is_405_error():
             print("Client made an invalid request: " + self.HTTP_parser.get_request_method() + ":Sending 405 status code\n")
             response = self.HTTP_parser.construct_HTTP_response(405)
