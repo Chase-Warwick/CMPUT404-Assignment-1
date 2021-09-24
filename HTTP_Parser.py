@@ -37,7 +37,7 @@ class HTTP_Parser():
         for type in file_types:
             if type in self.path:
                 return 'Content-Type:text/' + type
-        return 'Content-Type:text/plain'
+        return 'Content-Type:application/octet-stream'
     
     def initialize_path(self, data):
         """
