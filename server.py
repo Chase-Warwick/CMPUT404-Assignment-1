@@ -40,7 +40,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
         self.FORBIDDEN_PATHS = ['../']
         
-        data = self.request.recv(1024).strip().decode('utf-8')
+        data = self.request.recv(131072).strip().decode('utf-8')
         print ("Got a request of: %s\n" % data)
         self.HTTP_parser = HTTP_Parser(data)
         
